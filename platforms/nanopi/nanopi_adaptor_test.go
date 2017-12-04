@@ -1,4 +1,4 @@
-package raspi
+package nanopi
 
 import (
 	"errors"
