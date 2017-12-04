@@ -1,5 +1,11 @@
 package nanopi
 
+/*
+ * TODO:
+ * - Support more revision
+ * - Check support for all hardware (e.g. I2S, UARTs, ADC)
+ */
+
 import (
 	"errors"
 	"fmt"
@@ -17,11 +23,9 @@ import (
 	xspi "golang.org/x/exp/io/spi"
 )
 
-var readFile = func() ([]byte, error) {
-	return ioutil.ReadFile("/proc/cpuinfo")
-}
+var supportedRevisions []string = []string{"NEOv1.2"}
 
-// Adaptor is the Gobot Adaptor for the Raspberry Pi
+// Adaptor is the Gobot Adaptor for the NanoPi
 type Adaptor struct {
 	mutex              *sync.Mutex
 	name               string
@@ -29,42 +33,50 @@ type Adaptor struct {
 	digitalPins        map[int]*sysfs.DigitalPin
 	pwmPins            map[int]*PWMPin
 	i2cDefaultBus      int
-	i2cBuses           [2]i2c.I2cDevice
+	i2cBuses           [1]i2c.I2cDevice
 	spiDefaultBus      int
-	spiBuses           [2]spi.SPIDevice
+	spiBuses           [1]spi.SPIDevice
 	spiDefaultMode     int
 	spiDefaultMaxSpeed int64
 }
 
+type errorString struct {
+    s string
+}
+
+func (e *errorString) Error() string {
+    return e.s
+}
+
 // NewAdaptor creates a Raspi Adaptor
-func NewAdaptor() *Adaptor {
+func NewAdaptor(revision String) *Adaptor, error {
 	r := &Adaptor{
 		mutex:       &sync.Mutex{},
 		name:        gobot.DefaultName("NanoPi"),
 		digitalPins: make(map[int]*sysfs.DigitalPin),
 		pwmPins:     make(map[int]*PWMPin),
 	}
-	content, _ := readFile()
-	for _, v := range strings.Split(string(content), "\n") {
-		if strings.Contains(v, "Revision") {
-			s := strings.Split(string(v), " ")
-			version, _ := strconv.ParseInt("0x"+s[len(s)-1], 0, 64)
-			r.i2cDefaultBus = 1
-			r.spiDefaultBus = 1
-			r.spiDefaultMode = 0
-			r.spiDefaultMaxSpeed = 500000
-			if version <= 3 {
-				r.revision = "1"
-				r.i2cDefaultBus = 0
-			} else if version <= 15 {
-				r.revision = "2"
-			} else {
-				r.revision = "3"
-			}
+
+	/* TODO: Check these values */
+	r.i2cDefaultBus = 1
+	r.spiDefaultBus = 1
+	r.spiDefaultMode = 0
+	r.spiDefaultMaxSpeed = 500000
+	r.i2cDefaultBus = 0
+	r.revision = "error"
+
+	for _, rev := range supportedRevision {
+		if rev == revision {
+			r.revision = revision
 		}
 	}
 
-	return r
+	if r.revision == "error" {
+		return nil, &errorString{"Unsupported revision for NanoPi"}
+	}
+
+	return r, nil
+
 }
 
 // Name returns the Adaptor's name
